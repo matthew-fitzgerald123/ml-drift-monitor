@@ -1,0 +1,24 @@
+# Environment
+.env
+
+# Model artifacts (regenerated via make seed)
+models/
+
+# MLflow local runs
+mlruns/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist/
+build/
+
+# Test / tooling
+.pytest_cache/
+.coverage
+htmlcov/
+
+# macOS
+.DS_Store
