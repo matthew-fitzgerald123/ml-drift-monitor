@@ -76,3 +76,13 @@ def test_retrain_trigger(client):
     r = client.post("/model/retrain")
     assert r.status_code == 200
     assert r.json()["status"] == "retraining started"
+
+
+def test_scheduler_status(client):
+    r = client.get("/scheduler/status")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["running"] is True
+    assert "interval_minutes" in data
+    assert "retrain_threshold" in data
+    assert "checks_run" in data

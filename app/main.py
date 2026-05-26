@@ -1,4 +1,5 @@
 from __future__ import annotations
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -10,24 +11,33 @@ from app.models import Base, PredictionLog, DriftEvent, ModelVersion
 from app.model_store import store
 from app.drift_detector import FeatureDriftDetector, PredictionDriftDetector
 from app.retraining import retrain_and_promote
+from app.scheduler import DriftScheduler
 
 load_dotenv()
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="ML Drift Monitor", version="1.0.0")
-
 FEATURE_NAMES = ["f0", "f1", "f2", "f3", "f4", "f5", "f6", "f7"]
 feature_detector = FeatureDriftDetector(feature_names=FEATURE_NAMES)
 prediction_detector = PredictionDriftDetector()
+_scheduler: DriftScheduler | None = None
 
 
-@app.on_event("startup")
-def startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global _scheduler
     try:
         store.load("v1")
         print(f"Loaded model: {store.version}")
     except FileNotFoundError:
         print("No model found — run: make seed")
+
+    _scheduler = DriftScheduler(store, feature_detector, prediction_detector)
+    _scheduler.start()
+    yield
+    _scheduler.stop()
+
+
+app = FastAPI(title="ML Drift Monitor", version="1.0.0", lifespan=lifespan)
 
 
 # ── Inference ─────────────────────────────────────────────
@@ -114,7 +124,7 @@ def get_drift_events(limit: int = 50, db: Session = Depends(get_db)):
     )
     return [
         {
-            "feature":    e.feature_name,
+            "feature":     e.feature_name,
             "drift_score": e.drift_score,
             "detected_at": str(e.created_at),
         }
@@ -148,11 +158,11 @@ def recent_predictions(limit: int = 20, db: Session = Depends(get_db)):
     )
     return [
         {
-            "entity_id":    l.entity_id,
-            "prediction":   l.prediction,
-            "probability":  l.probability,
+            "entity_id":     l.entity_id,
+            "prediction":    l.prediction,
+            "probability":   l.probability,
             "model_version": l.model_version,
-            "created_at":   str(l.created_at),
+            "created_at":    str(l.created_at),
         }
         for l in logs
     ]
@@ -188,10 +198,21 @@ def list_versions(db: Session = Depends(get_db)):
     ]
 
 
+# ── Scheduler ─────────────────────────────────────────────
+
+@app.get("/scheduler/status", tags=["monitoring"])
+def scheduler_status():
+    if _scheduler is None:
+        raise HTTPException(503, "Scheduler not initialised")
+    return _scheduler.status()
+
+
+# ── Health ────────────────────────────────────────────────
+
 @app.get("/health")
 def health():
     return {
-        "status":       "ok",
+        "status":        "ok",
         "model_version": store.version,
-        "model_loaded": store.model is not None,
+        "model_loaded":  store.model is not None,
     }
