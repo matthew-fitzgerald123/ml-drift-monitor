@@ -1,18 +1,52 @@
 from __future__ import annotations
+import json
+import logging
 import mlflow
 import os
+import urllib.request
 from datetime import datetime
 from dotenv import load_dotenv
 
-from app.model_store import ModelStore
+from app.model_store import ModelStore, MODEL_DIR
 from app.models import ModelVersion
 from app.database import SessionLocal
 
 load_dotenv()
+log = logging.getLogger(__name__)
 
 mlflow.set_tracking_uri(
     os.getenv("MLFLOW_TRACKING_URI", "postgresql://localhost/mlplatform")
 )
+
+P2_API_URL = os.getenv("P2_API_URL", "http://localhost:8080")
+P2_MODEL_NAME = os.getenv("P2_MODEL_NAME", "drift-monitor-model")
+
+
+def _register_in_p2(version: str, run_id: str, metrics: dict) -> bool:
+    """POST to P2 model registry. Returns True on success, False otherwise."""
+    artifact_uri = str(MODEL_DIR / f"{version}.pkl")
+    payload = json.dumps({
+        "name": P2_MODEL_NAME,
+        "version": version,
+        "artifact_uri": artifact_uri,
+        "metrics": {k: v for k, v in metrics.items() if isinstance(v, (int, float))},
+        "params": {"mlflow_run_id": run_id, "source": "drift_monitor"},
+    }).encode("utf-8")
+    try:
+        req = urllib.request.Request(
+            f"{P2_API_URL}/models/register",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            ok = resp.status < 300
+            if ok:
+                log.info("Registered %s in P2 model registry", version)
+            return ok
+    except Exception as exc:
+        log.warning("Could not register %s in P2 model registry: %s", version, exc)
+        return False
 
 
 def retrain_and_promote(trigger: str = "drift") -> dict:
@@ -49,6 +83,8 @@ def retrain_and_promote(trigger: str = "drift") -> dict:
         db.commit()
     finally:
         db.close()
+
+    _register_in_p2(version, run_id, metrics)
 
     print(f"Promoted {version}, metrics: {metrics}")
     return {"version": version, "run_id": run_id, "metrics": metrics}

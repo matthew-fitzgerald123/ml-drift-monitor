@@ -122,3 +122,10 @@ def test_retrain_falls_back_to_synthetic(monkeypatch):
     metrics = ms.retrain("test_fallback")
     assert metrics["data_source"] == "synthetic"
     assert metrics["accuracy"] > 0
+
+
+def test_p2_registry_skips_when_unavailable(monkeypatch):
+    import app.retraining as rt
+    monkeypatch.setattr(rt, "P2_API_URL", "http://localhost:19999")
+    result = rt._register_in_p2("v_test", "run123", {"accuracy": 0.9})
+    assert result is False
