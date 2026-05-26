@@ -12,6 +12,7 @@ from app.model_store import store
 from app.drift_detector import FeatureDriftDetector, PredictionDriftDetector
 from app.retraining import retrain_and_promote
 from app.scheduler import DriftScheduler
+from app.alerting import send_drift_alert
 
 load_dotenv()
 Base.metadata.create_all(bind=engine)
@@ -96,6 +97,7 @@ def check_and_log_drift(features: dict, probability: float, db_url: str):
                     detected=True,
                     window_size=0,
                 ))
+                send_drift_alert(fname, 1, store.version)
 
         if pred_drift:
             db.add(DriftEvent(
@@ -105,6 +107,7 @@ def check_and_log_drift(features: dict, probability: float, db_url: str):
                 detected=True,
                 window_size=0,
             ))
+            send_drift_alert("prediction_probability", 1, store.version)
 
         db.commit()
     finally:

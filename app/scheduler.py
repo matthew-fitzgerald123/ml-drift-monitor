@@ -97,12 +97,14 @@ class DriftScheduler:
     async def _auto_retrain(self):
         import asyncio
         from app.retraining import retrain_and_promote
+        from app.alerting import send_retrain_alert
         try:
             result = await asyncio.to_thread(retrain_and_promote, trigger="scheduled")
             self.store.load(result["version"])
             self.fd.reset_all()
             self.pd.reset()
             self._retrain_count += 1
-            log.info("Auto-retrain complete — promoted %s", result["version"])
+            log.info("Auto-retrain complete, promoted %s", result["version"])
+            send_retrain_alert(result["version"], "scheduled", result.get("metrics", {}))
         except Exception:
             log.exception("Auto-retrain failed")

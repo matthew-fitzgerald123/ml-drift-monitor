@@ -86,3 +86,22 @@ def test_scheduler_status(client):
     assert "interval_minutes" in data
     assert "retrain_threshold" in data
     assert "checks_run" in data
+
+
+def test_alert_skips_when_no_webhook(monkeypatch):
+    from app.alerting import send_drift_alert
+    monkeypatch.setenv("ALERT_WEBHOOK_URL", "")
+    import importlib, app.alerting as al
+    monkeypatch.setattr(al, "ALERT_WEBHOOK_URL", "")
+    result = send_drift_alert("f0", 3, "v1")
+    assert result is False
+
+
+def test_alert_payload_shape():
+    from app.alerting import _build_payload
+    payload = _build_payload("f3", 7, "v2")
+    assert payload["feature"] == "f3"
+    assert payload["event_count"] == 7
+    assert payload["model_version"] == "v2"
+    assert "detected_at" in payload
+    assert "text" in payload
