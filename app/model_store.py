@@ -42,12 +42,24 @@ class ModelStore:
         return pred, prob
 
     def retrain(self, version: str, n_samples: int = 1000) -> dict:
-        """Retrains on synthetic data for demo purposes."""
-        X, y = make_classification(
-            n_samples=n_samples,
-            n_features=8,
-            random_state=np.random.randint(0, 9999),
-        )
+        """
+        Retrain the model. Tries to fetch real feature data from the P2
+        feature store first; falls back to synthetic data if unavailable.
+        """
+        from app.feature_store_client import fetch_training_data
+
+        real_data = fetch_training_data()
+        if real_data is not None:
+            X, y = real_data
+            data_source = "p2_feature_store"
+        else:
+            X, y = make_classification(
+                n_samples=n_samples,
+                n_features=8,
+                random_state=np.random.randint(0, 9999),
+            )
+            data_source = "synthetic"
+
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, test_size=0.2, random_state=42
         )
@@ -57,8 +69,10 @@ class ModelStore:
         preds = model.predict(X_test)
         proba = model.predict_proba(X_test)[:, 1]
         metrics = {
-            "accuracy": round(accuracy_score(y_test, preds), 4),
-            "auc_roc":  round(roc_auc_score(y_test, proba), 4),
+            "accuracy":    round(accuracy_score(y_test, preds), 4),
+            "auc_roc":     round(roc_auc_score(y_test, proba), 4),
+            "data_source": data_source,
+            "n_train":     len(X_train),
         }
         self.save(model, version)
         return metrics

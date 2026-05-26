@@ -105,3 +105,20 @@ def test_alert_payload_shape():
     assert payload["model_version"] == "v2"
     assert "detected_at" in payload
     assert "text" in payload
+
+
+def test_feature_store_client_returns_none_when_unavailable(monkeypatch):
+    from app import feature_store_client as fsc
+    monkeypatch.setattr(fsc, "P2_API_URL", "http://localhost:19999")
+    result = fsc.fetch_training_data()
+    assert result is None
+
+
+def test_retrain_falls_back_to_synthetic(monkeypatch):
+    from app import feature_store_client as fsc
+    monkeypatch.setattr(fsc, "P2_API_URL", "http://localhost:19999")
+    from app.model_store import ModelStore
+    ms = ModelStore()
+    metrics = ms.retrain("test_fallback")
+    assert metrics["data_source"] == "synthetic"
+    assert metrics["accuracy"] > 0

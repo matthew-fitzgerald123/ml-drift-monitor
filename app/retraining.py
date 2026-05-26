@@ -26,10 +26,14 @@ def retrain_and_promote(trigger: str = "drift") -> dict:
     print(f"Retraining → {version} (trigger={trigger})")
     metrics = store.retrain(version=version)
 
+    # Separate numeric metrics from string/int metadata for MLflow
+    numeric_metrics = {k: float(v) for k, v in metrics.items() if isinstance(v, (int, float))}
+    meta_params = {k: str(v) for k, v in metrics.items() if not isinstance(v, (int, float))}
+
     mlflow.set_experiment("drift_monitor_retraining")
     with mlflow.start_run(run_name=version) as run:
-        mlflow.log_params({"trigger": trigger, "version": version})
-        mlflow.log_metrics(metrics)
+        mlflow.log_params({"trigger": trigger, "version": version, **meta_params})
+        mlflow.log_metrics(numeric_metrics)
         run_id = run.info.run_id
 
     db = SessionLocal()
@@ -46,5 +50,5 @@ def retrain_and_promote(trigger: str = "drift") -> dict:
     finally:
         db.close()
 
-    print(f"Promoted {version} — metrics: {metrics}")
+    print(f"Promoted {version}, metrics: {metrics}")
     return {"version": version, "run_id": run_id, "metrics": metrics}
