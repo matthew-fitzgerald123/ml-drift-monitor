@@ -117,14 +117,11 @@ def check_and_log_drift(features: dict, probability: float, db_url: str):
 # ── Monitoring ────────────────────────────────────────────
 
 @app.get("/drift/events", tags=["monitoring"])
-def get_drift_events(limit: int = 50, db: Session = Depends(get_db)):
-    events = (
-        db.query(DriftEvent)
-        .filter(DriftEvent.detected == True)
-        .order_by(DriftEvent.created_at.desc())
-        .limit(limit)
-        .all()
-    )
+def get_drift_events(feature: str = None, limit: int = 50, db: Session = Depends(get_db)):
+    q = db.query(DriftEvent).filter(DriftEvent.detected == True)
+    if feature:
+        q = q.filter(DriftEvent.feature_name == feature)
+    events = q.order_by(DriftEvent.created_at.desc()).limit(limit).all()
     return [
         {
             "feature":     e.feature_name,
