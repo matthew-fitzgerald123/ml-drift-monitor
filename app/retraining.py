@@ -14,9 +14,7 @@ from app.database import SessionLocal
 load_dotenv()
 log = logging.getLogger(__name__)
 
-mlflow.set_tracking_uri(
-    os.getenv("MLFLOW_TRACKING_URI", "postgresql://localhost/mlplatform")
-)
+_DEFAULT_MLFLOW_URI = "postgresql://localhost/mlplatform"
 
 P2_API_URL = os.getenv("P2_API_URL", "http://localhost:8080")
 P2_MODEL_NAME = os.getenv("P2_MODEL_NAME", "drift-monitor-model")
@@ -64,6 +62,7 @@ def retrain_and_promote(trigger: str = "drift") -> dict:
     numeric_metrics = {k: float(v) for k, v in metrics.items() if isinstance(v, (int, float))}
     meta_params = {k: str(v) for k, v in metrics.items() if not isinstance(v, (int, float))}
 
+    mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", _DEFAULT_MLFLOW_URI))
     mlflow.set_experiment("drift_monitor_retraining")
     with mlflow.start_run(run_name=version) as run:
         mlflow.log_params({"trigger": trigger, "version": version, **meta_params})
