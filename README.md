@@ -67,6 +67,8 @@ flowchart TD
 
 ## Setup
 
+Requires PostgreSQL running locally. Retraining calls out to the [ml-platform](https://github.com/matthew-fitzgerald123/ml-platform) (P2) API at `P2_API_URL`, so start that service first if you want live retraining rather than the synthetic fallback.
+
 ```bash
 createdb ml_drift_monitor
 pip install -r requirements.txt
