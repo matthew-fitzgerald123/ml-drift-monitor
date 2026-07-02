@@ -90,6 +90,7 @@ make test       # run test suite
 | `DATABASE_URL` | `postgresql://localhost/drift_monitor` | Postgres connection |
 | `P2_API_URL` | `http://localhost:8080` | P2 ML platform base URL |
 | `P2_FEATURE_SET` | `financial_signals` | Feature set to pull for retraining |
+| `P2_MODEL_NAME` | `drift-monitor-model` | Model name to register new versions under in the P2 registry |
 | `DRIFT_CHECK_INTERVAL` | `15` | Scheduler interval in minutes |
 | `DRIFT_RETRAIN_THRESHOLD` | `5` | Drift events per window before auto-retrain |
 | `ALERT_WEBHOOK_URL` | _(unset)_ | POST target for drift/retrain alerts |
