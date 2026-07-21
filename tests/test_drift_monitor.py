@@ -88,6 +88,50 @@ def test_scheduler_status(client):
     assert "checks_run" in data
 
 
+def test_drift_features_endpoint(client):
+    r = client.get("/drift/features")
+    assert r.status_code == 200
+    data = r.json()
+    assert "threshold" in data
+    assert "drifting_count" in data
+    assert isinstance(data["features"], list)
+    assert len(data["features"]) == 8
+    sample = data["features"][0]
+    for key in ("feature", "drifting", "window_width", "mean_estimate", "variance", "n_detections"):
+        assert key in sample
+
+
+def test_feature_detector_status_reports_drift():
+    from app.drift_detector import FeatureDriftDetector
+    det = FeatureDriftDetector(feature_names=["a", "b"])
+    # Feed a stable stream then a sharp shift on "a" to trip ADWIN.
+    for _ in range(100):
+        det.update("a", 0.0)
+    for _ in range(100):
+        det.update("a", 5.0)
+    for _ in range(100):
+        det.update("b", 0.5)
+
+    status = {s["feature"]: s for s in det.status()}
+    assert status["a"]["drifting"] is True
+    assert status["a"]["mean_estimate"] > 1.0
+    assert status["b"]["drifting"] is False
+    assert status["b"]["window_width"] > 0
+
+
+def test_feature_detector_reset_clears_drift_flag():
+    from app.drift_detector import FeatureDriftDetector
+    det = FeatureDriftDetector(feature_names=["a"])
+    for _ in range(100):
+        det.update("a", 0.0)
+    for _ in range(100):
+        det.update("a", 5.0)
+    assert det.status()[0]["drifting"] is True
+    det.reset_all()
+    assert det.status()[0]["drifting"] is False
+    assert det.status()[0]["window_width"] == 0
+
+
 def test_alert_skips_when_no_webhook(monkeypatch):
     from app.alerting import send_drift_alert
     monkeypatch.setenv("ALERT_WEBHOOK_URL", "")

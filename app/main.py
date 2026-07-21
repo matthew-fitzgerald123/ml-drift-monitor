@@ -148,6 +148,17 @@ def drift_summary(db: Session = Depends(get_db)):
     }
 
 
+@app.get("/drift/features", tags=["monitoring"])
+def drift_features():
+    """Live per-feature ADWIN state: which features are drifting and their window stats."""
+    statuses = feature_detector.status()
+    return {
+        "threshold":       feature_detector.threshold,
+        "drifting_count":  sum(1 for s in statuses if s["drifting"]),
+        "features":        statuses,
+    }
+
+
 @app.get("/predictions/recent", tags=["monitoring"])
 def recent_predictions(limit: int = 20, db: Session = Depends(get_db)):
     logs = (

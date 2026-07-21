@@ -108,6 +108,7 @@ make test       # run test suite
 |---|---|---|
 | GET | `/drift/events` | Recent drift events |
 | GET | `/drift/summary` | Total drift count + active model |
+| GET | `/drift/features` | Live per-feature ADWIN state: which features are drifting + window stats |
 | GET | `/predictions/recent` | Recent prediction log |
 | GET | `/scheduler/status` | Scheduler state, interval, next run |
 
